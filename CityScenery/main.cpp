@@ -173,14 +173,14 @@ struct homePalette
 
 void idle()
 {
-    carSpeed = viewX;
+    carSpeed = viewX; //carSpeed is tied to camera position
 
     sceneTimer++;
 
     if (sceneState == 0) //stay at scene 1
     {
-        viewX = 0.0f;
-        if (sceneTimer >= fpsAdjuster)
+        viewX = 0.0f; //camera is not moving
+        if (sceneTimer >= fpsAdjuster) //after 3000 frames, change scenes
         {
             sceneTimer = 0;
             sceneState = 1;
@@ -188,7 +188,7 @@ void idle()
     }
     else if (sceneState == 1) // go to scene 2
     {
-        viewX += 0.5f;
+        viewX += 0.5f; //camera moves
         if (viewX >= 900)
         {
             viewX = 900;
@@ -237,7 +237,7 @@ void idle()
     else if (sceneState == 6) //stay at scene 4
     {
         viewX = 2700.0f;
-        if (sceneTimer >= fpsAdjuster)
+        if (sceneTimer >= fpsAdjuster) //reset all the scenes, along with their object position
         {
             buildingCloudSpeed = 0.0f;
             flyoverCloudSpeed = 0.0f;
@@ -260,29 +260,27 @@ void idle()
 
 float getCarY(float x)
 {
-    if (x < 900)
-    {
-        return 0.0f;
-    }
-    else if (x >= 900 && x <= 1000) // ramp up at flyover
+    if (x >= 900 && x <= 1000) // move UP at flyover ramp
     {
         return (x - 900);
+        //car moves up one unit for each increment in x
+        // aka if the camera is at x = 900, car is at 900-900=0 -> same y position
+        //     if the camera is at x = 901, car is at 901-900=0 -> move up 1 unit
     }
-    else if (x > 1000 && x <= 1800)
+    else if (x > 1000 && x <= 2600)
     {
         return 100.0f;
+        //stay at UP position for flyover and bridge
     }
-    else if (x > 1800 && x <= 2600)
-    {
-        return 100.0f;
-    }
-    else if (x > 2600 && x <= 2700)  // ramp down at bridge
+    else if (x > 2600 && x <= 2700)  // move DOWN at bridge ramp
     {
         return 100.0f - (x - 2600);
+        //reverse logic
     }
     else
     {
         return 0.0f;
+        //stay at original DOWN y position for other scenes
     }
 }
 
@@ -305,10 +303,12 @@ void drawCircle(int xCenter, int yCenter, int radius, float r, float g, float b,
 void drawCar()
 {
     glPushMatrix();
-    glTranslatef(carSpeed, getCarY(carSpeed + 350 ), 0);
+    glTranslatef(carSpeed+100, getCarY(carSpeed +475), 0);
     //350 tuned to y to adjust when the car starts ramping up / down
     //INCREASE to make it earlier
     //DECREASE to make it later
+
+    //100 tuned to x to put it in the center of the screen
 
     //------------------------------------------------------------------------
     //CAR
