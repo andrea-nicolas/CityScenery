@@ -265,7 +265,7 @@ float getCarY(float x)
         return (x - 900);
         //car moves up one unit for each increment in x
         // aka if the camera is at x = 900, car is at 900-900=0 -> same y position
-        //     if the camera is at x = 901, car is at 901-900=0 -> move up 1 unit
+        //     if the camera is at x = 901, car is at 901-900=1 -> move up 1 unit
     }
     else if (x > 1000 && x <= 2600)
     {
