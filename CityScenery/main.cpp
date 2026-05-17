@@ -9,11 +9,11 @@ float twinkle = 0.0f;
 float containershipSpeed = 0.0f;
 float yachtSpeed = 0.0f;
 float planeSpeed = 0.0f;
-float carSpeed = -500.0f;
-float viewX = 0.0f;
-int sceneTimer = 0;
-int sceneState = 0;
-int fpsAdjuster = 3000;
+float carSpeed = 0.0f;
+float viewX = 0.0f; //controls the "camera"'s x position
+int sceneTimer = 0; //internal clock for scene transitions
+int sceneState = 0; //controls if we are staying at scene x or transition between scene x and y
+int fpsAdjuster = 3000; //internal clocks depend on how fast computer is rendering scenes
 
 
 struct buildingsPalette
@@ -173,7 +173,7 @@ struct homePalette
 
 void idle()
 {
-    carSpeed = viewX + 200.0f;
+    carSpeed = viewX;
 
     sceneTimer++;
 
@@ -191,7 +191,8 @@ void idle()
         viewX += 0.5f;
         if (viewX >= 900)
         {
-            viewX = 900; sceneTimer = 0;
+            viewX = 900;
+            sceneTimer = 0;
             sceneState = 2;
         }
     }
@@ -263,9 +264,9 @@ float getCarY(float x)
     {
         return 0.0f;
     }
-    else if (x >= 900 && x <= 1000) // ramp up
+    else if (x >= 900 && x <= 1000) // ramp up at flyover
     {
-        return (x - 900) * 1.0f;
+        return (x - 900);
     }
     else if (x > 1000 && x <= 1800)
     {
@@ -275,21 +276,15 @@ float getCarY(float x)
     {
         return 100.0f;
     }
-    else if (x > 2600 && x <= 2700)  // ramp down
+    else if (x > 2600 && x <= 2700)  // ramp down at bridge
     {
-        return 100.0f - (x - 2600) * 1.0f;
+        return 100.0f - (x - 2600);
     }
-    else if (x > 2700 && x <= 3600)
-    {
-        return 0.0f;
-    }
-
     else
     {
         return 0.0f;
     }
 }
-
 
 void drawCircle(int xCenter, int yCenter, int radius, float r, float g, float b,float a)
 {
@@ -310,7 +305,10 @@ void drawCircle(int xCenter, int yCenter, int radius, float r, float g, float b,
 void drawCar()
 {
     glPushMatrix();
-    glTranslatef(carSpeed-100.0f, getCarY(carSpeed + 238), 0);
+    glTranslatef(carSpeed, getCarY(carSpeed + 350 ), 0);
+    //350 tuned to y to adjust when the car starts ramping up / down
+    //INCREASE to make it earlier
+    //DECREASE to make it later
 
     //------------------------------------------------------------------------
     //CAR
