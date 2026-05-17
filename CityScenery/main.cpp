@@ -16,6 +16,22 @@ int sceneState = 0; //controls if we are staying at scene x or transition betwee
 int fpsAdjuster = 3000; //internal clocks depend on how fast computer is rendering scenes
 
 
+// Rain variables
+struct RainDrop {
+    float x, y, speed, length;
+};
+
+float plane1Speed = 0.0f;
+float jetSpeed = 0.0f;
+const int NUM_DROPS = 200;
+RainDrop rainDrops[NUM_DROPS];
+bool rainInitialized = false;
+bool rainActive = false;
+float rainOpacity = 0.0f;
+
+
+
+
 struct buildingsPalette
 {
     static void yellow()
@@ -180,6 +196,18 @@ void idle()
     if (sceneState == 0) //stay at scene 1
     {
         viewX = 0.0f; //camera is not moving
+
+         if (sceneTimer >= fpsAdjuster / 2)
+        {
+            rainActive = true;
+
+            if (rainOpacity < 1.0f)
+            {
+                rainOpacity += 0.0003f;
+                if (rainOpacity > 1.0f) rainOpacity = 1.0f;
+            }
+        }
+
         if (sceneTimer >= fpsAdjuster) //after 3000 frames, change scenes
         {
             sceneTimer = 0;
@@ -189,11 +217,19 @@ void idle()
     else if (sceneState == 1) // go to scene 2
     {
         viewX += 0.5f; //camera moves
+
+        if (rainOpacity > 0.0f)
+        {
+            rainOpacity -= 0.0005f;
+            if (rainOpacity < 0.0f) rainOpacity = 0.0f;
+        }
+
         if (viewX >= 900)
         {
             viewX = 900;
             sceneTimer = 0;
             sceneState = 2;
+            rainActive = false;
         }
     }
     else if (sceneState == 2) //stay at scene 2
@@ -251,8 +287,31 @@ void idle()
             viewX = 0.0f;
             sceneTimer = 0;
             sceneState = 0;
-            fpsAdjuster = 3000;
+            fpsAdjuster = 6000;
+
+            plane1Speed        = -400.0f;
+            jetSpeed           = -200.0f;
+            rainActive         = false;
+            rainOpacity        = 0.0f;
+            rainInitialized    = false;
         }
+    }
+
+    plane1Speed += 0.08f;
+
+    if(sceneState == 2 || sceneState == 3)
+    {
+        jetSpeed += 0.2f;
+
+        if(jetSpeed > 900)
+        {
+            jetSpeed = -900;
+        }
+    }
+
+    if(plane1Speed > 1200)
+    {
+        plane1Speed = -400;
     }
 
     glutPostRedisplay();
@@ -265,7 +324,7 @@ float getCarY(float x)
         return (x - 900);
         //car moves up one unit for each increment in x
         // aka if the camera is at x = 900, car is at 900-900=0 -> same y position
-        //     if the camera is at x = 901, car is at 901-900=1 -> move up 1 unit
+        //     if the camera is at x = 901, car is at 901-900=0 -> move up 1 unit
     }
     else if (x > 1000 && x <= 2600)
     {
@@ -282,6 +341,64 @@ float getCarY(float x)
         return 0.0f;
         //stay at original DOWN y position for other scenes
     }
+}
+
+void initRain()
+{
+    srand(42);
+    for (int i = 0; i < NUM_DROPS; i++)
+    {
+        rainDrops[i].x      = (float)(rand() % 900);
+        rainDrops[i].y      = (float)(rand() % 600);
+        rainDrops[i].speed  = 1.0f + (rand() % 15) * 0.1f;
+        rainDrops[i].length = 8.0f + (rand() % 12);
+    }
+    rainInitialized = true;
+}
+
+void updateAndDrawRain()
+{
+    if (!rainInitialized) initRain();
+
+    for (int i = 0; i < NUM_DROPS; i++)
+    {
+        rainDrops[i].y -= rainDrops[i].speed * rainOpacity;
+
+        if (rainDrops[i].y < -rainDrops[i].length)
+        {
+            rainDrops[i].y = 620.0f;
+            rainDrops[i].x = (float)(rand() % 900);
+        }
+    }
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glLineWidth(1.5f);
+
+    glBegin(GL_LINES);
+    for (int i = 0; i < NUM_DROPS; i++)
+    {
+        float alpha = (0.4f + (rainDrops[i].speed - 1.0f) / 10.0f) * rainOpacity;
+        glColor4f(0.6f, 0.75f, 0.95f, alpha);
+        glVertex2f(rainDrops[i].x, rainDrops[i].y);
+        glColor4f(0.7f, 0.85f, 1.0f, alpha + 0.2f * rainOpacity);
+        glVertex2f(rainDrops[i].x - 1.5f,
+                   rainDrops[i].y - rainDrops[i].length);
+    }
+    glEnd();
+
+    glPointSize(2.0f);
+    glBegin(GL_POINTS);
+    for (int i = 0; i < NUM_DROPS; i += 5)
+    {
+        if (rainDrops[i].y < 115.0f && rainDrops[i].y > 95.0f)
+        {
+            glColor4f(0.7f, 0.85f, 1.0f, 0.5f * rainOpacity);
+            glVertex2f(rainDrops[i].x - 3, 110.0f);
+            glVertex2f(rainDrops[i].x + 3, 110.0f);
+        }
+    }
+    glEnd();
 }
 
 void drawCircle(int xCenter, int yCenter, int radius, float r, float g, float b,float a)
@@ -389,17 +506,25 @@ void drawCar()
 
 void displayBuildings()
 {
-    //------------------------------------------------------------------------
     //SKY
     glBegin(GL_QUADS);
-    buildingsPalette::orange();  // lighter orange at bottom
+
+    float r = 1.0f   * (1.0f - rainOpacity) + 0.35f * rainOpacity;
+    float g = 0.82f  * (1.0f - rainOpacity) + 0.38f * rainOpacity;
+    float b = 0.502f * (1.0f - rainOpacity) + 0.45f * rainOpacity;
+
+    float r2 = 1.0f  * (1.0f - rainOpacity) + 0.22f * rainOpacity;
+    float g2 = 0.553f* (1.0f - rainOpacity) + 0.24f * rainOpacity;
+    float b2 = 0.247f* (1.0f - rainOpacity) + 0.30f * rainOpacity;
+
+    glColor3f(r, g, b);
     glVertex2i(0, 400);
     glVertex2i(900, 400);
-    glColor3f(1.0f, 0.553f, 0.247f);  // darker orange at top
+    glColor3f(r2, g2, b2);
     glVertex2i(900, 600);
     glVertex2i(0, 600);
 
-    buildingsPalette::orange();
+    glColor3f(r, g, b);
     glVertex2i(0, 0);
     glVertex2i(0, 400);
     glVertex2i(900, 400);
@@ -787,8 +912,6 @@ void displayBuildings()
         glEnd();
     }
 
-
-    // redraw the grey building strip that passes through
      homePalette::grey();
     glBegin(GL_QUADS);
     glVertex2i(800, 400);
@@ -796,6 +919,65 @@ void displayBuildings()
     glVertex2i(850, 440);
     glVertex2i(850, 400);
     glEnd();
+     homePalette::grey();
+    glBegin(GL_QUADS);
+    glVertex2i(800, 400);
+    glVertex2i(800, 440);
+    glVertex2i(850, 440);
+    glVertex2i(850, 400);
+    glEnd();
+
+    //------------------------------------------------------------------------
+    // PLANE SCENE 1
+
+    glPushMatrix();
+    glTranslatef(plane1Speed, 0, 0);
+
+    // plane body
+    glColor3f(0.85f,0.85f,0.85f);
+    glBegin(GL_QUADS);
+    glVertex2i(120,520);
+    glVertex2i(200,520);
+    glVertex2i(210,535);
+    glVertex2i(120,535);
+    glEnd();
+
+    // front
+    glBegin(GL_TRIANGLES);
+    glVertex2i(200,520);
+    glVertex2i(225,527);
+    glVertex2i(200,535);
+    glEnd();
+
+    // back wing
+    glBegin(GL_TRIANGLES);
+    glVertex2i(145,535);
+    glVertex2i(165,560);
+    glVertex2i(175,535);
+    glEnd();
+
+    // front wing
+    glBegin(GL_TRIANGLES);
+    glVertex2i(155,520);
+    glVertex2i(175,495);
+    glVertex2i(185,520);
+    glEnd();
+
+    // tail
+    glBegin(GL_TRIANGLES);
+    glVertex2i(120,535);
+    glVertex2i(110,555);
+    glVertex2i(130,535);
+    glEnd();
+
+    // windows
+    glColor3f(0.3f,0.5f,0.8f);
+    for(int i=0;i<5;i++)
+    {
+        drawCircle(140 + i*12,528,2,0.3f,0.5f,0.8f,1.0f);
+    }
+
+    glPopMatrix();
 
     //------------------------------------------------------------------------
     //LAMPOSTS
@@ -810,6 +992,11 @@ void displayBuildings()
 
         drawCircle(150+i*200,180,40,1.0f, 0.945f, 0.502f,0.3f); //light - yellow part
         drawCircle(150+i*200,180,8,1.0f,0.82f,0.502f,0.7f); //light - orange part
+    }
+
+    if (rainActive && (sceneState == 0 || sceneState == 1))
+    {
+        updateAndDrawRain();
     }
 
     buildingCloudSpeed += 0.008f;
@@ -847,6 +1034,81 @@ void displayFlyover()
     drawCircle(1607,549,16,1.0f, 0.792f, 0.643f,1.0f);
     drawCircle(1634,553,18,1.0f, 0.792f, 0.643f,1.0f);
     glPopMatrix();
+
+    // ================= JET PLANE =================
+
+    if(sceneState == 2 || sceneState == 3)
+    {
+        glPushMatrix();
+        glTranslatef(jetSpeed, 0, 0);
+
+        // ---------------- BODY ----------------
+        glColor3f(0.82f,0.82f,0.84f);
+        glBegin(GL_QUADS);
+        glVertex2i(1050,540);
+        glVertex2i(1130,540);
+        glVertex2i(1155,553);
+        glVertex2i(1050,553);
+        glEnd();
+
+        // ---------------- NOSE ----------------
+        glBegin(GL_TRIANGLES);
+        glVertex2i(1130,540);
+        glVertex2i(1170,546);
+        glVertex2i(1130,553);
+        glEnd();
+
+        // ---------------- TOP WING ----------------
+        glBegin(GL_TRIANGLES);
+        glVertex2i(1085,553);
+        glVertex2i(1110,580);
+        glVertex2i(1125,553);
+        glEnd();
+
+        // ---------------- LOWER WING ----------------
+        glBegin(GL_TRIANGLES);
+        glVertex2i(1090,540);
+        glVertex2i(1120,515);
+        glVertex2i(1130,540);
+        glEnd();
+
+        // ---------------- TAIL ----------------
+        glBegin(GL_TRIANGLES);
+        glVertex2i(1050,553);
+        glVertex2i(1035,575);
+        glVertex2i(1065,553);
+        glEnd();
+
+        // ---------------- WINDOWS ----------------
+        glColor3f(0.2f,0.5f,0.9f);
+        for(int i=0;i<5;i++)
+        {
+            drawCircle(1072+i*12,547,2,0.2f,0.5f,0.9f,1.0f);
+        }
+
+        // ---------------- ENGINE ----------------
+        glColor3f(0.3f,0.3f,0.3f);
+        glBegin(GL_QUADS);
+        glVertex2i(1075,536);
+        glVertex2i(1090,536);
+        glVertex2i(1090,542);
+        glVertex2i(1075,542);
+        glVertex2i(1100,536);
+        glVertex2i(1115,536);
+        glVertex2i(1115,542);
+        glVertex2i(1100,542);
+        glEnd();
+
+        // ---------------- FIRE GLOW ----------------
+        drawCircle(1045,546,5,1.0f,0.5f,0.1f,0.8f);
+
+        // ---------------- SMOKE ----------------
+        drawCircle(1030,546,6,0.8f,0.8f,0.8f,0.3f);
+        drawCircle(1015,548,9,0.8f,0.8f,0.8f,0.2f);
+        drawCircle(995,550,12,0.8f,0.8f,0.8f,0.15f);
+
+        glPopMatrix();
+    }
 
     //------------------------------------------------------------------------
     //ROAD
